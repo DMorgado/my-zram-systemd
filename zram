@@ -3,7 +3,7 @@
 NUM_CPUS=$(nproc)
 [ "$NUM_CPUS" != 0 ] || NUM_CPUS=1
 NUM_DEVS=$NUM_CPUS
-FACTOR=50 # percentage
+FACTOR=10 # percentage
 TOTALRAM=$(grep MemTotal /proc/meminfo | awk ' { print $2 } ')
 #DISK_SIZE="256M"
 DISK_SIZE=$(($TOTALRAM/$NUM_CPUS*$FACTOR/100*1024))
