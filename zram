@@ -1,0 +1,52 @@
+#!/bin/bash
+
+NUM_CPUS=$(nproc)
+[ "$NUM_CPUS" != 0 ] || NUM_CPUS=1
+NUM_DEVS=$NUM_CPUS
+FACTOR=50 # percentage
+TOTALRAM=$(grep MemTotal /proc/meminfo | awk ' { print $2 } ')
+#DISK_SIZE="256M"
+DISK_SIZE=$(($TOTALRAM/$NUM_CPUS*$FACTOR/100*1024))
+
+#Defaults for vm.overcommit_memory, vm.page-cluster, vm.spwapiness
+OVERCOMMIT_MEMORY=0
+PAGE_CLUSTER=3
+SPWAPINESS=60
+
+
+start() {
+  [ ! -e /sys/module/zram ] && modprobe zram num_devices=$NUM_DEVS || modprobe -r zram && modprobe zram num_devices=$NUM_DEVS
+  for i in /sys/block/zram*; do
+    /usr/bin/echo $DISK_SIZE > ${i}/disksize;
+  done
+
+  for i in /dev/zram*; do
+    /usr/sbin/mkswap ${i};
+    /usr/sbin/swapon -d -p100 ${i};
+  done
+  
+  echo 1 > /proc/sys/vm/overcommit_memory
+  echo 0 > /proc/sys/vm/page-cluster
+  echo 100 > /proc/sys/vm/swappiness
+}
+
+stop() {
+  [ ! -e /sys/module/zram ] && exit 0
+
+  echo $OVERCOMMIT_MEMORY > /proc/sys/vm/overcommit_memory
+  echo $PAGE_CLUSTER > /proc/sys/vm/page-cluster
+  echo $SPWAPINESS > /proc/sys/vm/swappiness
+
+  for i in /dev/zram*; do
+    /usr/sbin/swapoff ${i};
+  done
+
+  for i in /sys/block/zram*; do
+    /usr/bin/echo 1 > ${i}/reset;
+  done
+  [ -e /sys/module/zram ] && modprobe -r zram
+}
+
+case $1 in
+  (start|stop) "$1" ;;
+esac
